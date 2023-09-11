@@ -26,33 +26,44 @@ headers = {
     "authorization": "Bearer " + token
 }
 
-url = "https://" + host + "/api/iacp/v3/workspaces"
+page = 1
 
-response = requests.get(url, headers=headers)
+while True:
 
-if response.status_code != 200:
-    print("Request failed. Wrong token?")
-    sys.exit(1)
-
-data = json.loads(response.text)
-
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-
-for item in data['data']:
-
-    url = "https://" + host + "/api/iacp/v3/workspaces/" + item['id'] + "/current-state-version"
+    url = "https://" + host + "/api/iacp/v3/workspaces?page[number]=" + str(page)
 
     response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print("Request failed. Wrong token?")
+        sys.exit(1)
+
     data = json.loads(response.text)
 
-    try:
-        download_link = data['data']['links']['download']
-    except KeyError:
-        continue
+    total_pages = data['meta']['pagination']['total-pages']
 
-    print("Downloading state file for " + item['id'] + " to " + output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    response = requests.get(download_link)
-    with open(output_dir + "/" + item['id'] + ".json", "wb") as f:
-        f.write(response.content)
+    for item in data['data']:
+
+        url = "https://" + host + "/api/iacp/v3/workspaces/" + item['id'] + "/current-state-version"
+
+        response = requests.get(url, headers=headers)
+        data = json.loads(response.text)
+
+        try:
+            download_link = data['data']['links']['download']
+        except KeyError:
+            continue
+
+        print("Downloading state file for " + item['id'] + " to " + output_dir)
+
+        response = requests.get(download_link)
+        with open(output_dir + "/" + item['id'] + ".json", "wb") as f:
+            f.write(response.content)
+
+    if page == total_pages:
+        sys.exit(0)
+
+    page += 1
